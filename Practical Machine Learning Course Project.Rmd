@@ -1,0 +1,183 @@
+---
+title: "Practical Machine Learning Course Project"
+author: "Corey L"
+date: "8/1/2019"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r message=FALSE}
+library(caret)
+library(visdat)
+library(gbm)
+library(dplyr)
+set.seed(42) # The answer to everything.
+```
+
+## Getting the data,   
+Reading the comma separated values into objects
+```{r echo=TRUE, message=FALSE}
+#Creating a data folder in the working dirctory and downloading the datasets for the assignment
+ if(!file.exists("./data")){dir.create("./data")}
+        fileUrl <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+        download.file(fileUrl,destfile="./data/training.csv")
+        fileUrl <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+        download.file(fileUrl,destfile="./data/testing.csv")
+```
+
+```{r}
+datatrain <- read.csv("./data/training.csv", na.strings=c('NA','','#DIV/0!')) # Training Data
+datatest <- read.csv("./data/testing.csv", na.strings=c('NA','','#DIV/0!'))   # Test Data
+```
+## Exploratory Analysis  
+
+Dimensions of the dataset  
+```{r}
+dim(datatrain)
+```
+The training dataset has 19622 obs. of 160 variables  
+
+The target variable for prediction in this database are listed in the `classe` column
+```{r}
+str(datatrain$classe)
+```
+  
+Unique values in datatrain$classe
+```{r}
+unique(datatrain$classe)
+```
+
+List of all column names in the dataset
+```{r}
+colnames(datatrain)
+```
+
+
+## Data Cleaning
+The first seven columns of the datasets contain user names, timecodes and data that is irrelevant to predicting exercises.  for prediction model training, the columns will be removed.  Also within the datasets are `NA` and non-zero values.  The invalid values are not compatible with prediction models and will be removed by eliminating the columns that contain them as a majority. Each cleaning process applied to the training dataset will also be applied to the testing dataset.  
+
+Observing the NA, and invalid data in the training dataset after removing unnecessary columns
+```{r}
+table(is.na(datatrain))
+```
+There are `1,925,102` NA values in the dataset.  
+
+Visualizing the amount of missing data in the training dataset.  Column names are overlaying due to the number of the columns, but the graph performs a function of representing missing data.
+```{r}
+vis_dat(datatrain, warn_large_data = FALSE)
+```
+
+
+From observing the graph above, we can see that there is very little valid data in the areas populated with many `na` values.  The loss of this data will have a minimal impact on training our models.  The columns that possess more than `90%` of their values as `NA` will be removed.
+```{r}
+colrmv <- which(colSums(is.na(datatrain) |datatrain=="")>0.9*dim(datatrain)[1]) 
+datatraincl <- datatrain[,-colrmv]
+datatraincl <- datatraincl[,-c(1:7)]
+```
+
+Dimensions of the new dataset with columns removed
+```{r}
+dim(datatraincl)
+```
+
+Columns to be be considered for the prediction model for having invalid, or NA values
+```{r}
+str(datatraincl)
+```
+
+Observing `NA` in the cleaned dataset
+```{r}
+table(is.na(datatraincl))
+```
+Visualizing the cleaned training dataset
+```{r}
+vis_dat(datatraincl, warn_large_data = FALSE)
+```
+## Cross validation of within the training dataset  
+
+Splitting the `datatrain` set into testing and training variables, `70%` training split.
+```{r}
+inTrain = createDataPartition(y=datatraincl$classe, p = 0.7, list=FALSE)
+training = datatraincl[inTrain,]
+testing = datatraincl[-inTrain,]
+```
+Setting cross validation parameters for the following models
+```{r}
+fitControl <- trainControl(method='cv', 
+                number = 3, 
+                allowParallel = TRUE)
+```
+## Training Prediction Models  
+
+Training a Random Forest Model
+```{r}
+rfmod <- train(classe ~.,
+               method="rf",
+               data=training,
+               trControl=fitControl)
+rfmod
+```
+
+Training a Stochastic Gradient Boosted Model
+```{r}
+gbmmod <- train(classe ~., 
+              data = training, 
+              method = "gbm", 
+              trControl = fitControl,
+              verbose = FALSE)
+gbmmod
+```
+
+Training a Bagged CART Model
+```{r}
+bcmod <- train(classe ~., 
+              data = training, 
+              method = "treebag", 
+              trControl = fitControl)
+bcmod
+```
+
+
+Training with Quinlan’s C5.0 algorithm
+```{r}
+brmod <- train(classe ~., 
+              data = training, 
+              method = "C5.0", 
+              trControl = fitControl)
+brmod
+```
+
+## Cross Validation with the testing dataset 
+Comparing the the three model's performance against the `testing` dataset.  The accuracy of each will be presented as a table.  For each model, the `testing` dataset was used to assess prediction performance, and its output was stored as an object.  The confusion matrix of the resultant object was used to predict the `$classe` variable in the dataset.  Accuracy of all model predictions were stored as a set and presented for observation.
+```{r}
+predRF <- predict(rfmod, newdata=testing)
+cmRF <- confusionMatrix(predRF, testing$classe)
+predGBM <- predict(gbmmod, newdata=testing)
+cmGBM <- confusionMatrix(predGBM, testing$classe)
+predBRR <- predict(brmod, newdata=testing)
+cmBRR <- confusionMatrix(predBRR, testing$classe)
+AccuracyResults <- data.frame(
+  Model = c('RF', 'GBM', 'BRR'),
+  Accuracy = rbind(cmRF$overall[1], cmGBM$overall[1], cmBRR$overall[1])
+)
+print(AccuracyResults)
+```
+From the table above, we can see the Stochastic Gradient Boosted Model `BRR` has the highest accuracy rate of `99.6%`.  For cross validation of the training sample, we will use this model on the provided testing set.  
+
+## Results and Proof of Prediction
+
+Using the best model `brmod` on the training set.
+```{r}
+predictTEST <- predict(brmod, newdata=datatest)
+predictTEST
+```
+From this output, the final course quiz was completed with a graded score of `100%`.
+
+## Appendix  
+### Data Source
+Ugulino, W.; Cardador, D.; Vega, K.; Velloso, E.; Milidiu, R.; Fuks, H. Wearable Computing: Accelerometers' Data Classification of Body Postures and Movements. Proceedings of 21st Brazilian Symposium on Artificial Intelligence. Advances in Artificial Intelligence - SBIA 2012. In: Lecture Notes in Computer Science. , pp. 52-61. Curitiba, PR: Springer Berlin / Heidelberg, 2012. ISBN 978-3-642-34458-9. DOI: 10.1007/978-3-642-34459-6_6. 
+Cited by 2 (Google Scholar)
