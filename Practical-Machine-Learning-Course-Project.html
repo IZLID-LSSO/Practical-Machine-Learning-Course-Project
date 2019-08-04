@@ -374,6 +374,9 @@ summary {
 library(visdat)
 library(gbm)
 library(dplyr)
+library(parallel)
+library(doParallel)
+library(beepr)
 set.seed(42) # The answer to everything.</code></pre>
 <div id="getting-the-data" class="section level2">
 <h2>Getting the data,</h2>
@@ -655,12 +658,12 @@ bcmod</code></pre>
 ## 
 ##   Accuracy   Kappa    
 ##   0.9807818  0.9756915</code></pre>
-<p>Training with Quinlan’s C5.0 algorithm</p>
-<pre class="r"><code>brmod &lt;- train(classe ~., 
+<p>Training with Quinlan’s C5.0 algorithm, which uses both basic-tree, and rules based models</p>
+<pre class="r"><code>c50mod &lt;- train(classe ~., 
               data = training, 
               method = &quot;C5.0&quot;, 
               trControl = fitControl)
-brmod</code></pre>
+c50mod</code></pre>
 <pre><code>## C5.0 
 ## 
 ## 13737 samples
@@ -697,27 +700,30 @@ brmod</code></pre>
 cmRF &lt;- confusionMatrix(predRF, testing$classe)
 predGBM &lt;- predict(gbmmod, newdata=testing)
 cmGBM &lt;- confusionMatrix(predGBM, testing$classe)
-predBRR &lt;- predict(brmod, newdata=testing)
-cmBRR &lt;- confusionMatrix(predBRR, testing$classe)
+predc50 &lt;- predict(c50mod, newdata=testing)
+cmc50 &lt;- confusionMatrix(predc50, testing$classe)
 AccuracyResults &lt;- data.frame(
-  Model = c('RF', 'GBM', 'BRR'),
-  Accuracy = rbind(cmRF$overall[1], cmGBM$overall[1], cmBRR$overall[1])
+  Model = c('RF', 'GBM', 'C5.0'),
+  Accuracy = rbind(cmRF$overall[1], cmGBM$overall[1], cmc50$overall[1])
 )
 print(AccuracyResults)</code></pre>
 <pre><code>##   Model  Accuracy
 ## 1    RF 0.9949023
 ## 2   GBM 0.9634664
-## 3   BRR 0.9960918</code></pre>
-<p>From the table above, we can see the Stochastic Gradient Boosted Model <code>BRR</code> has the highest accuracy rate of <code>99.6%</code>. For cross validation of the training sample, we will use this model on the provided testing set.</p>
+## 3  C5.0 0.9960918</code></pre>
+<p>From the table above, we can see the Quinlan’s C5.0 algorithm <code>C50</code> has the highest accuracy rate of <code>99.6%</code>. For cross validation of the training sample, we will use this model on the provided testing set.</p>
 </div>
 <div id="results-and-proof-of-prediction" class="section level2">
 <h2>Results and Proof of Prediction</h2>
-<p>Using the best model <code>brmod</code> on the training set.</p>
-<pre class="r"><code>predictTEST &lt;- predict(brmod, newdata=datatest)
+<p>Using the best model <code>c50mod</code> on the training set.</p>
+<pre class="r"><code>predictTEST &lt;- predict(c50mod, newdata=datatest)
 predictTEST</code></pre>
 <pre><code>##  [1] B A B A A E D B A A B C B A E E A B B B
 ## Levels: A B C D E</code></pre>
 <p>From this output, the final course quiz was completed with a graded score of <code>100%</code>.</p>
+<pre class="r"><code>beep(&quot;coin&quot;) # Signals file processing is complete, X3 for effect
+beep(&quot;coin&quot;)
+beep(&quot;coin&quot;)</code></pre>
 </div>
 <div id="appendix" class="section level2">
 <h2>Appendix</h2>

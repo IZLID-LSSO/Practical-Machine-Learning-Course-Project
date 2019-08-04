@@ -15,6 +15,9 @@ library(caret)
 library(visdat)
 library(gbm)
 library(dplyr)
+library(parallel)
+library(doParallel)
+library(beepr)
 set.seed(42) # The answer to everything.
 ```
 
@@ -142,13 +145,13 @@ bcmod
 ```
 
 
-Training with Quinlan’s C5.0 algorithm
+Training with Quinlan’s C5.0 algorithm, which uses both basic-tree, and rules based models
 ```{r}
-brmod <- train(classe ~., 
+c50mod <- train(classe ~., 
               data = training, 
               method = "C5.0", 
               trControl = fitControl)
-brmod
+c50mod
 ```
 
 ## Cross Validation with the testing dataset 
@@ -158,24 +161,30 @@ predRF <- predict(rfmod, newdata=testing)
 cmRF <- confusionMatrix(predRF, testing$classe)
 predGBM <- predict(gbmmod, newdata=testing)
 cmGBM <- confusionMatrix(predGBM, testing$classe)
-predBRR <- predict(brmod, newdata=testing)
-cmBRR <- confusionMatrix(predBRR, testing$classe)
+predc50 <- predict(c50mod, newdata=testing)
+cmc50 <- confusionMatrix(predc50, testing$classe)
 AccuracyResults <- data.frame(
-  Model = c('RF', 'GBM', 'BRR'),
-  Accuracy = rbind(cmRF$overall[1], cmGBM$overall[1], cmBRR$overall[1])
+  Model = c('RF', 'GBM', 'C5.0'),
+  Accuracy = rbind(cmRF$overall[1], cmGBM$overall[1], cmc50$overall[1])
 )
 print(AccuracyResults)
 ```
-From the table above, we can see the Stochastic Gradient Boosted Model `BRR` has the highest accuracy rate of `99.6%`.  For cross validation of the training sample, we will use this model on the provided testing set.  
+From the table above, we can see the Quinlan’s C5.0 algorithm `C50` has the highest accuracy rate of `99.6%`.  For cross validation of the training sample, we will use this model on the provided testing set.  
 
 ## Results and Proof of Prediction
 
-Using the best model `brmod` on the training set.
+Using the best model `c50mod` on the training set.
 ```{r}
-predictTEST <- predict(brmod, newdata=datatest)
+predictTEST <- predict(c50mod, newdata=datatest)
 predictTEST
 ```
 From this output, the final course quiz was completed with a graded score of `100%`.
+```{r}
+beep("coin") # Signals file processing is complete, X3 for effect
+beep("coin")
+beep("coin")
+
+```
 
 ## Appendix  
 ### Data Source
